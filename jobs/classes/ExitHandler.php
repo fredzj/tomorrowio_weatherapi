@@ -33,6 +33,7 @@
  * @author Fred Onis
  */
 class ExitHandler {
+    private $log;
     private $timeStart;
 
      /**
@@ -41,6 +42,7 @@ class ExitHandler {
      * @param float $timeStart The start time of the script execution.
      */
     public function __construct($timeStart) {
+        $this->log = new Log();
         $this->timeStart = $timeStart;
     }
 
@@ -57,11 +59,12 @@ class ExitHandler {
             ? round($executionTime / 60, 2) . " minutes" 
             : round($executionTime, 2) . " seconds";
 
-        echo date("[G:i:s] ") . PHP_EOL;
-        echo date("[G:i:s] ") . 'Memory usage' . PHP_EOL;
-        echo date("[G:i:s] ") . '- current usage: ' . round(memory_get_usage() / (1024 * 1024)) . ' MB' . PHP_EOL;
-        echo date("[G:i:s] ") . '- peak usage: ' . round(memory_get_peak_usage() / (1024 * 1024)) . ' MB' . PHP_EOL;
-        echo date("[G:i:s] ") . PHP_EOL;
-        echo date("[G:i:s] ") . 'Total Execution Time: ' . $executionText . PHP_EOL;
+            $currentUsage = round(memory_get_usage() / (1024 * 1024), 2) . ' MB';
+            $peakUsage = round(memory_get_peak_usage() / (1024 * 1024), 2) . ' MB';
+    
+            $this->log->info('Memory usage:');
+            $this->log->info('- current usage: ' . $currentUsage);
+            $this->log->info('- peak usage: ' . $peakUsage);
+            $this->log->info('Total Execution Time: ' . $executionText);
     }
 }

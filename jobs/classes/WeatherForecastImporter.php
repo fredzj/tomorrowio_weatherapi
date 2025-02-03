@@ -38,19 +38,20 @@ class WeatherForecastImporter {
 	private $dbConfigPath;
     private $config;
     private $inputUrl;
+	private $log;
     private $outputColumns = ['iso3166_1_alpha_2_code', 'iso3166_2_subdivision_code', 'timelines'];
 	private $outputDataLines = 0;
     private $outputValues;
     private $timeStart;
 
     public function __construct($dbConfigPath, $inputUrl) {
-        $this->db;
 		$this->dbConfigPath = $dbConfigPath;
-        $this->inputUrl = $inputUrl;
-        $this->registerExitHandler();
+		$this->inputUrl = $inputUrl;
+		$this->log = new Log();
+		$this->registerExitHandler();
 		$this->connectDatabase();
-        $this->importConfig();
-    }
+		$this->importConfig();
+	}
 
     /**
      * Register the exit handler.
@@ -77,7 +78,6 @@ class WeatherForecastImporter {
 			throw new Exception("Parsing file " . $this->dbConfigPath	. " FAILED");
 		}
 		$this->db = new Database($dbConfig);
-		unset($dbConfig);
 	}
 
     /**
@@ -92,17 +92,17 @@ class WeatherForecastImporter {
         $configuration = $this->getConfig();
     
         if (empty($configuration)) {
-            $this->logMessage('Error: Configuration for Tomorrow.io not found.');
+            $this->log->error('Error: Configuration for Tomorrow.io not found.');
             return;
         }
 
         $this->config = json_decode($configuration, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            $this->logMessage('Error: Failed to decode JSON configuration - ' . json_last_error_msg());
+            $this->log->error('Error: Failed to decode JSON configuration - ' . json_last_error_msg());
             $this->config = [];
         } else {
-			$this->inputUrl .= $config['apikey'];
+			$this->inputUrl .= $this->config['apikey'];
 		}
     }
 
@@ -113,15 +113,15 @@ class WeatherForecastImporter {
      */
     public function import(): void {
 		$apiCallCount = $this->getApiCallCountToday();
-		$this->logMessage("Today's number of API calls: " . $apiCallCount);
+		$this->log->info("Today's number of API calls: " . $apiCallCount);
 		if ($apiCallCount < MAX_CALLS_PER_DAY) {
 
-			$coordinates = getNextCoordinates();
+			$coordinates = $this->getNextCoordinates();
 			foreach ($coordinates as $coordinate) {
 
-				$this->logMessage('Downloading weather for ' . $coordinate['iso3166_2_subdivision_name']);
-				$nextUrl = str_replace('<<LATLNG>>', $coordinate['latlng'], $inputUrl);
-				if (($contents = file_get_contents($nextUrl)) !== false) {
+				$this->log->info('Downloading weather for ' . $coordinate['iso3166_2_subdivision_name']);
+				$nextUrl = str_replace('<<LATLNG>>', $coordinate['latlng'], $this->inputUrl);
+				if (($contents = @file_get_contents($nextUrl)) !== false) {
 					
 					$this->outputValues = [
 						$coordinate['iso3166_1_alpha_2_code'],
@@ -134,14 +134,16 @@ class WeatherForecastImporter {
 						$this->db->update('vendor_tomorrow_io_weather', $coordinate['id'], "timelines='$contents'");
 					}
 					
-					$outputDataLines++;
+					$this->outputDataLines++;
 
+				} else {
+					$this->log->error('Error: Failed to download weather data for ' . $coordinate['iso3166_2_subdivision_name']);
 				}
 				sleep(1);
 			}
 
 		}
-        $this->logMessage('- ' . $outputDataLines . ' rows processed');
+        $this->log->info('- ' . $this->outputDataLines . ' rows processed');
     }
 
 	/**
@@ -155,7 +157,7 @@ class WeatherForecastImporter {
 		FROM		vendor_tomorrow_io_weather
 		WHERE		DATE(timestamp)					=	CURDATE()";
 		$fetchedRows = $this->db->select($sql);
-		return $fetched_rows[0]['count'];
+		return $fetchedRows[0]['count'];
 	}
 
 	/**
@@ -196,15 +198,4 @@ class WeatherForecastImporter {
 		LIMIT		" . MAX_CALLS_PER_HOUR;
 		return $this->db->select($sql);
 	}
-		
-    /**
-     * Logs a message with a timestamp.
-     *
-     * @param string $message The message to log.
-     *
-     * @return string
-     */
-    private function logMessage($message) {
-        echo date("[G:i:s] ") . $message . PHP_EOL;
-    }
 }

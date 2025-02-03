@@ -36,8 +36,9 @@
  */
 
 require 'classes/Database.php';
-require 'classes/WeatherForecastImporter.php';
 require 'classes/ExitHandler.php';
+require 'classes/Log.php';
+require 'classes/WeatherForecastImporter.php';
 
 // Set defaults
 define("MAX_CALLS_PER_DAY",		'500');
@@ -50,15 +51,16 @@ setlocale(LC_ALL, 'nl_NL.utf8');
 
 $dbConfigPath = substr(__DIR__, 0, mb_strrpos(__DIR__, '/')) . '/config/db.ini';
 $inputUrl = 'https://api.tomorrow.io/v4/weather/forecast?location=<<LATLNG>>&apikey=';
+$log = new Log();
 
 // Create an instance of the importer and run the import
 try {
     $importer = new WeatherForecastImporter($dbConfigPath, $inputUrl);
     $importer->import();
 } catch (PDOException $e) {
-    logError('Caught PDOException: ' . $e->getMessage());
+    $log->error('Caught PDOException: ' . $e->getMessage());
 } catch (Exception $e) {
-    logError('Caught Exception: ' . $e->getMessage());
+    $log->error('Caught Exception: ' . $e->getMessage());
 } finally {
 	// The exit handler will be called automatically at the end of the script
 }
